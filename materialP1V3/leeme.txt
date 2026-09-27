@@ -1,0 +1,28 @@
+Autores: Lucas Manuel Blanco Rodríguez
+         Alina Datsko Yaskerska
+
+Realizado/Parcialmente-Realizado/No-Realizado de las funcionalidades propuestas:
+    - Contar paquetes de una traza (independientemente del número de paquetes): Realizado
+      El número de paquetes que se contarán siempre dependerá del valor asociado a --npkts. En el caso de que no se
+      especifique explícitamente la cantidad, este valor valdrá -1, lo que significa que el número a contar es ilimitado
+      (esto figura en el Moodle) y se estarán contando hasta que el usuario corte la ejecución con Ctrl + C.
+    - Contar paquetes de la interfaz de red: Realizado
+      En la función "procesa_paquete", se va aumentando el número de paquetes procesados por cada llamada. Dicho número
+      termina siendo impreso cuando el usuario pulsa Ctrl + C o cuando se llega al número de paquetes que se especificó al
+      ejecutar el programa.
+    - Uso de un único "flujo" para traza e interfaz: Realizado
+      En esta comprobación (if args.interface: ... else) determinamos si los paquetes se van a capturar en vivo desde una 
+      interfaz de red mediante "pcap_open_live", o si se van a leer desde una traza .pcap mediante "pcap_open_offline". Una vez 
+      creado el handle, llamamos a "pcap_loop", que se encarga de obtener los paquetes y llamar a la función "procesa_paquete"
+      para procesarlos.
+    - Almacenar correctamente el tráfico capturado en vivo una traza: Realizado
+      Al realizar una captura en vivo mediante --itf, los paquetes recibidos se almacenan en dos archivos de trazas .pcap. 
+      Para cada paquete, se comprueban los bytes 12 y 13: si son 0x08 y 0x06, respectivamente, se almacena en la traza "capturaNOIP"
+      En el caso contrario, se almacena en captura. Se utiliza "pcap_dump" para guardar el paquete completo junto con su 
+      cabecera pcap, independientemente del número de bytes que se hayan mostrado por pantalla.
+    - Separar correctamente el trafico capturado en dos trazas: Realizado
+      Para separar correctamente el tráfico capturado en vivo, se comprueban los bytes 12 y 13 de cada trama. Si dichos 
+      bytes son 0x08 y 0x06, el paquete se almacena en la traza capturaNOIP; en caso contrario, se almacena en la traza captura. 
+      En ambos casos se guarda el paquete completo mediante "pcap_dump".
+
+    
