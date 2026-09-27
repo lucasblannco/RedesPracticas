@@ -1,6 +1,8 @@
 Autores:  Alina Datsko Yaskerska
           Lucas Manuel Blanco Rodríguez
 
+Archivos extra: captura_nbytes.jpg - Esta captura se nos pide en el último requisito de la práctica como muestra del funcionamiento
+
 Realizado/Parcialmente-Realizado/No-Realizado de las funcionalidades propuestas:
     - Contar paquetes de una traza (independientemente del número de paquetes): Realizado
       El número de paquetes que se contarán siempre dependerá del valor asociado a --npkts. En el caso de que no se
