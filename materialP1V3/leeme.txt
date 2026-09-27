@@ -32,7 +32,9 @@ Realizado/Parcialmente-Realizado/No-Realizado de las funcionalidades propuestas:
       Hemos comprobado que se calcula correctamente la diferencia entre el primer paquete y el último. Además, hemos tratado el caso 
       límite en el que solo hay un paquete, en el cual, como debe ser, la diferencia es trivialmente cero segundos.
     - Imprimir los N primeros bytes de un paquete (pruebe para N>32) y validarlo con Wireshark (captura de pantalla): Realizado: 
-      Hemos probado con --nbytes mayores de 32 y así comprobamos que nos muestra correctamente esos N primeros bytes en hexadecimal 
-      y las líneas de hasta 16 bytes. Adjuntamos la captura de pantalla en la que se muestra dicho caso a continuación (42 bytes): 
+      Hemos probado el programa con valores de --nbytes mayores de 32 y hemos comprobado que muestra correctamente los N primeros bytes en 
+      hexadecimal, organizados en líneas de hasta 16 bytes. Para evitar que la última línea mostrase siempre 16 bytes aunque quedasen menos por 
+      imprimir, se estableció como límite el mínimo entre nbytes e i + 16 en el bucle de impresión. Adjuntamos una captura de pantalla en la que 
+      se comprueba con --nbytes 55. 
 
     
