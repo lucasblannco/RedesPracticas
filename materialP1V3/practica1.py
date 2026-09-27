@@ -54,7 +54,7 @@ def procesa_paquete(us, header, data):
         nbytes = min(args.nbytes, len(data))
 
     for i in range(0, nbytes, 16):
-        linea = data[i:i + 16]
+        linea = data[i:min(i + 16, nbytes)]
         texto = " ".join("{:02X}".format(byte) for byte in linea)
         logging.info(texto)
 
