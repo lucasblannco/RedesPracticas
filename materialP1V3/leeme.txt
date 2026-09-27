@@ -1,5 +1,5 @@
-Autores: Lucas Manuel Blanco Rodríguez
-         Alina Datsko Yaskerska
+Autores:  Alina Datsko Yaskerska
+          Lucas Manuel Blanco Rodríguez
 
 Realizado/Parcialmente-Realizado/No-Realizado de las funcionalidades propuestas:
     - Contar paquetes de una traza (independientemente del número de paquetes): Realizado
