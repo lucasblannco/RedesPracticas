@@ -24,5 +24,15 @@ Realizado/Parcialmente-Realizado/No-Realizado de las funcionalidades propuestas:
       Para separar correctamente el tráfico capturado en vivo, se comprueban los bytes 12 y 13 de cada trama. Si dichos 
       bytes son 0x08 y 0x06, el paquete se almacena en la traza capturaNOIP; en caso contrario, se almacena en la traza captura. 
       En ambos casos se guarda el paquete completo mediante "pcap_dump".
+    - Gestionar  correctamente el numero de paquetes a leer: Realizado: 
+      Hemos ejecutado el programa con diferentes valores de --npkts y hemos ido verificando dicho número de paquetes. 
+      Tal y como lo hemos programado, el valor predeterminado si no se especifica, será -1, lo que hace que se capture ininterrumpidamente 
+      hasta que se use Ctrl + C.
+    - Calcular tiempo entre último y primer paquete: Realizado: 
+      Hemos comprobado que se calcula correctamente la diferencia entre el primer paquete y el último. Además, hemos tratado el caso 
+      límite en el que solo hay un paquete, en el cual, como debe ser, la diferencia es trivialmente cero segundos.
+    - Imprimir los N primeros bytes de un paquete (pruebe para N>32) y validarlo con Wireshark (captura de pantalla): Realizado: 
+      Hemos probado con --nbytes mayores de 32 y así comprobamos que nos muestra correctamente esos N primeros bytes en hexadecimal 
+      y las líneas de hasta 16 bytes. Adjuntamos la captura de pantalla en la que se muestra dicho caso a continuación (42 bytes): 
 
     
