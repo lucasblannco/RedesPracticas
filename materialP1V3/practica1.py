@@ -105,6 +105,11 @@ if __name__ == "__main__":
         logging.basicConfig(
             level=logging.INFO, format="[%(asctime)s %(levelname)s]\t%(message)s"
         )
+        
+    if args.tracefile and args.interface:
+        logging.error("No se debe usar --file y --itf a la vez")
+        parser.print_help()
+        sys.exit(-1)
 
     if args.tracefile is False and args.interface is False:
         logging.error("No se ha especificado interfaz ni fichero")
@@ -120,13 +125,21 @@ if __name__ == "__main__":
     ultimo_timestamp = None
     pdumper_NOIP = None
     pdumper_IP = None
+    descr = None
 
     # TODO abrir la interfaz especificada para captura o la traza
+    
     # TODO abrir un dumper para volcar el tráfico (si se ha especificado interfaz)
     if args.interface:
         handle = pcap_open_live(args.interface, ETH_FRAME_MAX, PROMISC, TO_MS, errbuf)
     else:
         handle = pcap_open_offline(args.tracefile, errbuf)
+        
+    if handle is None:
+        logging.error("No se ha abierto interfaz o fichero")
+        logging.error(errbuf)
+        sys.exit(-1)
+        
 
     if args.interface:
         fecha = int(time.time())
