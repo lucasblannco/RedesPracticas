@@ -30,7 +30,6 @@ def printHelp():
 
 
 if __name__ == "__main__":
-    global pdumper, args, handle, el, stop
     parser = argparse.ArgumentParser(
         description="Esta práctica ejecuta resoluciones ARP. Dada una dirección IP devuelve cual es la MAC asociada en la LAN actual",
         formatter_class=RawTextHelpFormatter,
@@ -66,6 +65,13 @@ if __name__ == "__main__":
         logging.error("Ethernet no inicializado")
         sys.exit(-1)
     # TODO iniciar nivel EthMsg
+    
+    # Inicializamos la mensajeria Ethernet
+    if initEthMsg(args.interface) != 0:
+        logging.error("EthMsg error al inicializar")
+        stopEthernetLevel()
+        sys.exit(-1)
+
     # Inicializamos ARP. Si no podemos inicializar salimos.
     if initARP(args.interface) == -1:
         logging.error("ARP no inicializado")
@@ -114,7 +120,7 @@ if __name__ == "__main__":
                 )  # vuelve a generar el mensaje tras quitar la m
                 print(f"Enviando mensaje de {len(mensaje)} Bytes: {mensaje}")
                 # Aquí puedes llamar a una función que maneje el envío de mensajes
-                sendEthMsg(mensaje)
+                sendEthMsg(mensaje.encode("utf-8"))
             # TODO ARP gratuito
             else:
                 print("Comando no reconocido. 'h' para ayuda.\n")
