@@ -23,6 +23,9 @@ ARPHeader = bytes([0x00, 0x01, 0x08, 0x00, 0x06, 0x04])
 # longitud (en bytes) de la cabecera común ARP
 ARP_HLEN = 6
 
+# ETHTYPE según el enunciado de Moodle
+ETHTYPE = 0x0806
+
 # Variable que alamacenará que dirección IP se está intentando resolver
 requestedIP = None
 # Variable que alamacenará que dirección MAC resuelta o None si no se ha podido obtener
@@ -128,7 +131,7 @@ def processARPRequest(data: bytes, MAC: bytes) -> None:
     respuesta = createARPReply(ipOrigen, macOrigen)
 
     # Enviamos la respuesta al ordenador que nos ha preguntado
-    sendEthernetFrame(respuesta, len(respuesta), 0x0806, macOrigen)
+    sendEthernetFrame(respuesta, len(respuesta), ETHTYPE, macOrigen)
 
 
 def processARPReply(data: bytes, MAC: bytes) -> None:
@@ -325,7 +328,7 @@ def initARP(interface: str) -> int:
     Descripción: Esta función construirá inicializará el nivel ARP. Esta función debe realizar, al menos, las siguientes tareas:
         -Registrar la función del callback process_arp_frame con el Ethertype 0x0806
         -Obtener y almacenar la dirección MAC e IP asociadas a la interfaz especificada
-        -Realizar una petición ARP gratuita y comprobar si la IP propia ya está asignada. En caso positivo se debe devolver error.
+        -Realizar tres peticiones ARP gratuita y comprobar si la IP propia ya está asignada. En caso positivo se debe devolver error.
         -Marcar la variable de nivel ARP inicializado a True
     """
     global myIP, myMAC, arpInitialized
@@ -342,7 +345,7 @@ def initARP(interface: str) -> int:
         return -1
 
     # Registramos el protocolo ARP en Ethernet
-    registerEthCallback(process_arp_frame, 0x0806)
+    registerEthCallback(process_arp_frame, ETHTYPE)
 
     # Comprobamos si otro equipo utiliza nuestra IP
     macEncontrada = ARPResolution(myIP)
@@ -398,13 +401,13 @@ def ARPResolution(ip: int) -> bytes:
             resolvedMAC = None
 
         # Enviamos la peticion y reintentamos hasta 3 veces
-        for intento in range(4):
+        for intento in range(3):
 
             with globalLock:
                 if not awaitingResponse:
                     break
 
-            if sendEthernetFrame(peticion, len(peticion), 0x0806, broadcastAddr) == -1:
+            if sendEthernetFrame(peticion, len(peticion), ETHTYPE, broadcastAddr) == -1:
                 break
 
             # Esperamos como maximo un segundo
@@ -419,6 +422,7 @@ def ARPResolution(ip: int) -> bytes:
 
         # Guardamos el resultado y limpiamos las variables
         with globalLock:
+            # Si no se recibió respuesta, la variable resolvedMAC sigue valiendo None
             mac = resolvedMAC
             requestedIP = None
             resolvedMAC = None
