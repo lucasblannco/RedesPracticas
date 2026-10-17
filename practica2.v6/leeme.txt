@@ -1,0 +1,107 @@
+Autores:  Alina Datsko Yaskerska
+          Lucas Manuel Blanco Rodríguez
+
+Realizado/Parcialmente-Realizado/No-Realizado de las funcionalidades propuestas:
+    - Recibir tramas Ethernet, realizar comprobaciones y llamar correctamente a la función 
+      de callback de nivel superior: Realizado
+      La función que se encarga de esta funcionalidad es process_Ethernet_frame (línea 52, archivo ethernet.py). 
+      Esta función se ejecutará cada vez que llegue una trama Ethernet. Primero comprueba si la trama tiene
+      una cabecera Ethernet completa, ya que necesita al menos 14 bytes para poder extraer sus campos. 
+      Después, extrae las direcciones MAC de destino y origen, y el EtherType, que indica qué protocolo 
+      de nivel superior contiene la trama.
+      A continuación, comprueba si la dirección MAC de destino es la propia o la de broadcast. Si no es
+      ninguna de estas dos, descarta la trama. Luego extrae el payload, es decir, los datos de la trama 
+      sin incluir la cabecera Ethernet, y comprueba si existe una función de callback asociada al EtherType
+      recibido. Si existe, la llama pasándole los parámetros correspondientes: us, header, payload y srcMac. 
+      Si no existe ninguna función asociada, descarta la trama. 
+      Para que esto funcione, la función registerEthCallback se encarga de guardar en el diccionario
+      EthernetProtocols la función de callback asociada a cada EtherType.
+    - Enviar tramas Ethernet correctamente: Realizado
+      La función que se encarga de esta funcionalidad es sendEthernetFrame (línea 260, archivo ethernet.py).
+      Esta función construye una trama Ethernet con los datos recibidos y la envía por la interfaz de red. 
+      Primero comprueba que el nivel Ethernet esté inicializado y que la interfaz tenga los datos necesarios 
+      para poder enviar la trama. Después, comprueba que la longitud de los datos sea correcta, que no sea
+      negativa, que no supere la longitud de data y que no exceda el tamaño máximo permitido para el payload. 
+      También comprueba que la MAC de destino tenga 6 bytes y que el EtherType tenga un valor válido.
+      A continuación, construye la cabecera Ethernet con la siguiente instrucción:
+      header = dstMac + macAddress + etherType.to_bytes(2, "big"). En esta línea se concatenan la MAC de destino,
+      la MAC de origen de nuestra interfaz y el EtherType, que identifica el protocolo de nivel superior 
+      que se está enviando. Después, construye la trama completa con frame = header + payload, concatenando 
+      la cabecera Ethernet con los datos del protocolo de nivel superior. 
+      También comprueba si la trama es demasiado pequeña y, si es así, añade ceros hasta alcanzar el tamaño
+      mínimo establecido. Por último, envía la trama mediante pcap_inject y comprueba que se haya enviado por 
+      completo. Si se produce algún error o no se envía toda la trama, devuelve -1; si todo funciona
+      correctamente, devuelve 0.
+    - Imprimir mensajes sobre el protocolo 0x0AA0: Realizado
+      La función que se encarga de esta funcionalidad es process_ethMsg_frame (línea 23, archivo ethmsg.py).
+      Esta función se ejecutará cada vez que se reciba una trama Ethernet del protocolo 0x0AA0, siempre que
+      se haya registrado correctamente el callback. Primero comprueba que los datos recibidos tengan al menos
+      dos bytes, que son los que indican la longitud del mensaje. Después, obtiene esa longitud y comprueba
+      que se haya recibido el mensaje completo. Si los datos no son suficientes, descarta el mensaje. 
+      A continuación, extrae el contenido del mensaje, convierte la dirección MAC del remitente a un formato 
+      legible y obtiene el tiempo de recepción a partir de la cabecera header, que contiene los segundos y
+      microsegundos en los que se ha recibido la trama. Después, convierte el mensaje de bytes a texto 
+      utilizando UTF-8 y lo imprime siguiendo el formato indicado: [segundos.microsegundos] MAC: mensaje.
+      Para que esta función se ejecute al recibir mensajes de este protocolo, la función initEthMsg registra
+      process_ethMsg_frame como callback asociado al EtherType 0x0AA0 mediante registerEthCallback.
+      Además, la función sendEthMsg se encarga de enviar los mensajes. Primero comprueba que la longitud del
+      mensaje se pueda representar en dos bytes y, después, construye los datos que se enviarán, añadiendo
+      al principio la longitud del mensaje en orden de red y, a continuación, el propio mensaje.  
+      Finalmente, llama a sendEthernetFrame para enviar la trama en broadcast a todos los equipos de la red 
+      local. Si el envío falla, devuelve None; si se realiza correctamente, devuelve la longitud del mensaje
+      enviado.
+    - Enviar correctamente peticiones ARP: Realizado
+      La función que se encarga de construir las peticiones ARP es createARPRequest (línea 207, archivo arp.py), 
+      mientras que ARPResolution (línea 365, mismo archivo) se encarga de gestionar el envío de estas peticiones.
+      La función createARPRequest construye el contenido de la petición ARP añadiendo la cabecera común, 
+      indicando que se trata de una petición mediante el opcode 1, y añadiendo nuestra MAC e IP. Como todavía
+      no conocemos la MAC del equipo al que queremos enviar la petición, se añaden seis bytes a cero en el
+      campo de MAC destino. Por último, añade la IP que queremos resolver.
+      Después, la función ARPResolution comprueba si la IP ya está en la caché ARP. Si no está, construye la 
+      petición y la envía mediante sendEthernetFrame, utilizando el EtherType 0x0806 y la dirección de broadcast
+      para que llegue a los equipos de la red local. Si no recibe respuesta, vuelve a enviar la petición hasta
+      un máximo de tres intentos. Si recibe una respuesta válida, devuelve la MAC encontrada; si no, 
+      devuelve None.
+    - Procesar correctamente peticiones ARP recibidas: Realizado 
+      La función que se encarga de esta funcionalidad es processARPRequest (línea 87, archivo arp.py), 
+      a la que se llama desde process_arp_frame (línea 273, mismo archivo) cuando se recibe una petición ARP.
+      Esta función comprueba primero que los datos recibidos tengan la longitud necesaria. Después, extrae la
+      MAC de origen de la petición y comprueba que coincida con la MAC de origen recibida desde el nivel Ethernet. 
+      También descarta las peticiones que hemos enviado nosotros mismos, ya que esas no esperan respuesta. 
+      A continuación, extrae la IP de origen y la IP de destino de la petición. Si la IP de destino no coincide 
+      con nuestra IP, no hace nada y descarta la petición. Si coincide, construye una respuesta ARP mediante
+      createARPReply y la envía con sendEthernetFrame a la MAC del equipo que ha realizado la petición.
+    - Enviar correctamente respuestas ARP: Realizado
+      La función que se encarga de construir las respuestas ARP es createARPReply (línea 239, archivo arp.py), 
+      mientras que processARPRequest se encarga de enviarlas cuando recibe una petición dirigida a nuestra IP.
+      La función createARPReply construye el contenido de la respuesta ARP añadiendo la cabecera común y el
+      opcode 2, que indica que se trata de una respuesta. Después, añade nuestra MAC e IP, seguidas de la MAC
+      y la IP del equipo que ha realizado la petición. De esta forma, el otro equipo recibe la información 
+      necesaria para asociar nuestra IP con nuestra MAC.  
+      Una vez construida la respuesta, processARPRequest la envía mediante sendEthernetFrame, indicando como
+      destino la MAC del equipo que ha realizado la petición y utilizando el EtherType 0x0806.
+    - Procesar correctamente respuestas ARP: Realizado
+      La función que se encarga de esta funcionalidad es processARPReply (línea 137, archivo arp.py), a la que 
+      se llama desde process_arp_frame (línea 273, mismo archivo) cuando se recibe una respuesta ARP.
+      Esta función comprueba que los datos recibidos tengan la longitud necesaria y que la MAC de origen
+      incluida en la respuesta coincida con la MAC de origen recibida desde el nivel Ethernet. También descarta 
+      las respuestas que proceden de nuestra propia MAC. 
+      Después, extrae la MAC y la IP de origen, así como la MAC y la IP de destino. Comprueba que la respuesta 
+      esté dirigida a nuestra IP y a nuestra MAC. A continuación, verifica que realmente estemos esperando una 
+      respuesta para esa IP, comparando la IP de origen con requestedIP. 
+      Si todas las comprobaciones son correctas, guarda la asociación entre la IP y la MAC en la caché ARP, 
+      almacena la MAC encontrada en resolvedMAC y cambia awaitingResponse a False para indicar que ya se ha
+      recibido la respuesta. También establece requestedIP a None para indicar que ya no hay una resolución 
+      pendiente. Para evitar problemas al acceder simultáneamente a estas variables, utiliza globalLock. 
+    - Manejo correcto de la caché ARP: Realizado
+      La caché ARP se implementa mediante la variable cache, que almacena las asociaciones entre direcciones 
+      IP y direcciones MAC. Se utiliza un ExpiringDict, que permite eliminar automáticamente las entradas 
+      cuando pasan 10 segundos y limita la caché a un máximo de 100 entradas.
+      La función ARPResolution comprueba primero si la IP solicitada ya está en la caché. Si está, devuelve 
+      directamente la MAC asociada sin necesidad de enviar una petición ARP. Si no está, realiza el proceso 
+      de resolución y espera a recibir una respuesta.
+      Cuando se recibe una respuesta ARP válida, la función processARPReply guarda la asociación entre la 
+      IP de origen y la MAC de origen en la caché. Para evitar accesos simultáneos que puedan causar problemas, 
+      se utiliza cacheLock al consultar o modificar la caché.
+      Además, la función printCache permite mostrar por pantalla las asociaciones IP/MAC almacenadas en la 
+      caché, utilizando un formato legible para las direcciones IP y MAC.
