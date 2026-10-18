@@ -25,7 +25,7 @@ def printHelp():
     print("\ta <direccionIP> : Solicita ARP Request sobre la IP indicada\n")
     print("\tp : Imprime cache ARP\n")
     print("\th : Muestra la ayuda\n")
-    # TODO g : ARP gratuito
+    print("\tg : Compruba si nuestra IP está duplicada mediante ARP gratuito\n")
     print("\tq : Salir del programa\n")
 
 
@@ -121,7 +121,27 @@ if __name__ == "__main__":
                 print(f"Enviando mensaje de {len(mensaje)} Bytes: {mensaje}")
                 # Aquí puedes llamar a una función que maneje el envío de mensajes
                 sendEthMsg(mensaje.encode("utf-8"))
-            # TODO ARP gratuito
+            elif comando.startswith("g "):
+                print("Realizando ARP gratuita")
+
+                ipPropia = getIP(args.interface)
+                macPropia = getHwAddr(args.interface)
+
+                macEncontrada = ARPgratuito()
+
+                if macEncontrada is None:
+                    print("Tu IP no está duplicada")
+
+                elif macEncontrada != macPropia:
+                    macTexto = ":".join(
+                        f"{b:02X}" for b in macEncontrada
+                    )
+                    print("Direccion IP duplicada")
+                    print(f"IP: {socket.inet_ntoa(struct.pack('!I', ipPropia))}")
+                    print(f"MAC del otro equipo: {macTexto}")
+
+                else:
+                    print("Tu IP no está duplicada")
             else:
                 print("Comando no reconocido. 'h' para ayuda.\n")
         except KeyboardInterrupt:

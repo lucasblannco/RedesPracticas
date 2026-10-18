@@ -429,3 +429,11 @@ def ARPResolution(ip: int) -> bytes:
             awaitingResponse = False
 
         return mac
+    
+def ARPgratuito() -> bytes | None:
+    with cacheLock:
+        cache.pop(myIP, None)
+    return ARPResolution(myIP)
+    
+    
+    
