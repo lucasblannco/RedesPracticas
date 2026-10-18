@@ -105,3 +105,16 @@ Realizado/Parcialmente-Realizado/No-Realizado de las funcionalidades propuestas:
       se utiliza cacheLock al consultar o modificar la caché.
       Además, la función printCache permite mostrar por pantalla las asociaciones IP/MAC almacenadas en la 
       caché, utilizando un formato legible para las direcciones IP y MAC.
+    - ARP Gratuito: Realizado
+      Se ha implementado la funcionalidad opcional de ARP gratuito.
+      La función que se encarga de esta funcionaldad es ARPgratuito (línea 433, archivo arp.py), a la que se llama
+      desde el main cuando el comando es "g". 
+      La función ARPgratuito comienza eliminando del cache la asociación de nuestra IP y nuestra MAC, para que
+      se realice una petición ARP y no depender del caché. Tras esto, la función llama a ARPResolution con nuestra
+      IP. En esta función, como se ha explicado antes, al no estar la asociación en el cache, entra en el bucle, 
+      y se prueba (como máximo tres veces), si hay respuesta. Si no la hay, resolvedMAC sigue valiendo None, 
+      luego en el main, ocurre esta comprobación if macEncontrada is None, y sabríamos que no está duplicada
+      la IP. 
+      Si resolvedMAC es distinto de None, significaría que se ha obtenido respuesta de un dispositivo que no 
+      es el nuestro, luego la IP está duplicada. Mostramos en pantalla la dirección MAC del otro equipo con
+      la misma IP.
