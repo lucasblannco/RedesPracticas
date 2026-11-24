@@ -47,6 +47,62 @@ def process_ICMP_message(us,header,data,srcIp):
         Retorno: Ninguno
           
     '''
+
+    global icmp_send_times
+
+    # Comprobamos que los datos recibidos contienen al menos la cabecera ICMP
+    if len(data) < 8: return
+
+    # Calculamos el checksum ICMP sobre el mensaje completo (cabecera + datos). Si la longitud es impar añadimos un byte a 0 para hacer el cálculo
+    if len(data) % 2 == 1:
+        datosChecksum = data + bytes(1)
+    else:
+        datosChecksum = data
+
+    # Si el checksum no es correcto descartamos el mensaje
+    if chksum(datosChecksum) != 0:
+        logging.debug("Checksum ICMP incorrecto")
+        return
+
+    # Extraemos los campos tipo y código de la cabecera ICMP
+    tipo = data[0]
+    codigo = data[1]
+
+    # Loggeamos el tipo y el código
+    logging.debug(f"ICMP: type={tipo} code={codigo}")
+
+    if tipo == ICMP_ECHO_REQUEST_TYPE:
+        # Extraemos el identificador y el número de secuencia del mensaje recibido
+        icmp_id = int.from_bytes(data[4:6], "big")
+        icmp_seqnum = int.from_bytes(data[6:8], "big")
+
+        # Rebotar los datos: mismo id y seqnum, tipo REPLY, con los mismos identificador, número de secuencia y datos del Request
+        datos = data[8:]
+        sendICMPMessage(datos, ICMP_ECHO_REPLY_TYPE, 0, icmp_id, icmp_seqnum, srcIp)
+
+    elif tipo == ICMP_ECHO_REPLY_TYPE:
+        # Extraemos el identificador y el número de secuencia del mensaje
+        icmp_id = int.from_bytes(data[4:6], "big")
+        icmp_seqnum = int.from_bytes(data[6:8], "big")
+
+        # Tiempo de recepción del mensaje (contenido en la cabecera pcap)
+        tiempoRecepcion = header.ts.tv_sec + header.ts.tv_usec / 1000000
+
+        # Buscamos el tiempo de envío guardado para esta petición y lo eliminamos
+        clave = (srcIp, icmp_id, icmp_seqnum)
+        with timeLock:
+            tiempoEnvio = icmp_send_times.pop(clave, None)
+
+        # Si encontramos el tiempo de envío mostramos la estimación del RTT
+        if tiempoEnvio is not None:
+            rtt = tiempoRecepcion - tiempoEnvio
+            print("RTT estimado: {:.6f} s".format(rtt))
+
+    else:
+        #Tipo no soportado: no hacemos nada
+        return
+
+
     
 
 def sendICMPMessage(data,type,code,icmp_id,icmp_seqnum,dstIP):
@@ -78,8 +134,40 @@ def sendICMPMessage(data,type,code,icmp_id,icmp_seqnum,dstIP):
         Retorno: True o False en función de si se ha enviado el mensaje correctamente o no
           
     '''
-  
-    icmp_message = bytes()
+
+    global icmp_send_times
+
+    # Solo soportamos mensajes de tipo Echo Request y Echo Reply
+    if type != ICMP_ECHO_REQUEST_TYPE and type != ICMP_ECHO_REPLY_TYPE:
+        return False
+
+    # Construimos la cabecera ICMP con el checksum a 0 de momento
+    icmp_message = bytes([type, code])
+    icmp_message += bytes(2)
+    icmp_message += icmp_id.to_bytes(2, "big")
+    icmp_message += icmp_seqnum.to_bytes(2, "big")
+
+    # Añadimos los datos
+    icmp_message += data
+
+    # Calculamos el checksum sobre el mensaje completo (cabecera + datos). Si la longitud es impar añadimos un byte a 0 para el cálculo
+    if len(icmp_message) % 2 == 1:
+        datosChecksum = icmp_message + bytes(1)
+    else:
+        datosChecksum = icmp_message
+    checksum = chksum(datosChecksum)
+
+    # Añadimos el checksum en su campo correspondiente. El valor devuelto por checksum está en orden de red
+    icmp_message = icmp_message[:2] + checksum.to_bytes(2, "big") + icmp_message[4:]
+
+    # Si es un Echo Request guardamos el tiempo de envío para calcular el RTT
+    if type == ICMP_ECHO_REQUEST_TYPE:
+        clave = (dstIP, icmp_id, icmp_seqnum)
+        with timeLock:
+            icmp_send_times[clave] = time.time()
+
+    # Enviamos el mensaje usando el nivel IP (protocolo 1)
+    return sendIPDatagram(dstIP, icmp_message, ICMP_PROTO)
    
 def initICMP():
     '''
@@ -93,3 +181,5 @@ def initICMP():
         Retorno: Ninguno
           
     '''
+    # Registramos el nivel ICMP en la tabla de protocolos de nivel superior de IP
+    registerIPProtocol(process_ICMP_message, ICMP_PROTO)

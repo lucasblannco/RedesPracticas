@@ -18,8 +18,16 @@ protocols={}
 IP_MIN_HLEN = 20
 #Tamaño máximo de la cabecera IP
 IP_MAX_HLEN = 60
+
+#Ethertype asociado al protocolo IP
+ETHTYPE_IP = 0x0800
+#ToS que pondremos siempre en nuestros datagramas
+IP_TOS = 1
+#TTL que pondremos siempre en nuestros datagramas
+IP_TTL = 40
 # Nuestro número de pareja
 NUM_PAREJA = 9
+
 def chksum(msg):
     '''
         Nombre: chksum
@@ -165,22 +173,25 @@ def process_IP_datagram(us,header,data,srcMac):
     src_ip = int.from_bytes(data[12:16], "big")
     dst_ip = int.from_bytes(data[16:20], "big")
 
-    # Logeeamos los datos obtenidos
-    logging.debug(f"IP: hlen={long_header} ToS={ToS} IPID={ipid} "
+    # LogGeamos los datos obtenidos
+    logging.debug(f"IP: header lenght={long_header} ToS={ToS} IPID={ipid} "
                   f"DF={df_bit} MF={mf_bit} offset={offset * 8} TTL={ttl} "
-                  f"proto={protocol} "
+                  f"protocol={protocol} "
                   f"src={'.'.join([str(b) for b in struct.pack('!I', src_ip)])} "
                   f"dst={'.'.join([str(b) for b in struct.pack('!I', dst_ip)])}")
 
     # Si el offset vale 0 dejamos de procesar el datagrama
     if offset != 0: return
 
-    # Comprobamos si tenemos registrada una función de callback de nivel superior consultando el diccionario 
-    # protocols y usando como clave el valor del campo protocolo del datagrama IP
-    if protocol in protocols:
-        payload = data[long_header:long_total]
-        protocols[protocol](us, header, payload, src_ip)
+    #Buscamos si tenemos registrada una función de nivel superior para el protocolo
+    funciónCallback = protocols.get(protocol)
 
+    #Si no hay ninguna función registrada descartamos el datagrama
+    if funciónCallback is None: return
+
+    #Entregamos el payload al protocolo de nivel superior
+    payload = data[long_header:long_total]
+    funciónCallback(us, header, payload, src_ip)
 
 
 def registerIPProtocol(callback,protocol):
@@ -229,20 +240,24 @@ def initIP(interface,opts=None):
 
     # Inicializamos la ip
     if initARP(interface) != 0:
-        logging.error("Error inicializando ARP")
+        logging.error("Error inicializando el nivel ARP")
         return False
 
     # Obtenemos los datos de la interfaz y los guardamos en las variables globales
-    myIP = getIP(interface)
-    MTU = getMTU(interface)
-    netmask = getNetmask(interface)
-    defaultGW = getDefaultGW(interface)
+    try:
+        myIP = getIP(interface)
+        MTU = getMTU(interface)
+        netmask = getNetmask(interface)
+        defaultGW = getDefaultGW(interface)
+    except Exception as e:
+        logging.error('Error obteniendo los datos de la interfaz: %s', e)
+        return False
 
     # Guardamos las opciones
     ipOpts = opts
 
     # Registramos la función
-    registerEthCallback(process_IP_datagram, 0x0800)
+    registerEthCallback(process_IP_datagram, ETHTYPE_IP)
 
     # Inicializamos el ipid al número de pareja
     IPID = NUM_PAREJA 
@@ -274,7 +289,86 @@ def sendIPDatagram(dstIP,data,protocol):
         Retorno: True o False en función de si se ha enviado el datagrama correctamente o no
           
     '''
-    ip_header = bytes()
+    # Comprobamos que el nivel IP está inicializado
+    if myIP is None or MTU is None or netmask is None or defaultGW is None:
+        return False
 
+    # Calculamos la longitud de la cabecera (con o sin opciones)
+    if ipOpts is not None:
+        opciones = ipOpts
+    else:
+        opciones = bytes()
+    longCabecera = IP_MIN_HLEN + len(opciones)
+    ihl = longCabecera // 4
+
+    # Determinamos si hay que fragmentar y calculamos el número de fragmentos
+    if longCabecera + len(data) <= MTU:
+        # Todo cabe en un único datagrama -> no fragmentamos
+        numFragmentos = 1
+        maxDatos = max(len(data), 1)
+    else:
+        # Cantidad máxima de datos útiles por fragmento = suelo(MTU-longCabecera) * 8
+        maxDatos = ((MTU - longCabecera) // 8) * 8
+        numFragmentos = (len(data) + maxDatos - 1) // maxDatos
+
+    # Determinamos la MAC destino haciendo uso de la máscara de red: si la IP destino está en nuestra subred preguntamos 
+    # por dicha IP y si no lo está preguntamos por el gateway por defecto
+    if (dstIP & netmask) == (myIP & netmask):
+        macDestino = ARPResolution(dstIP)
+    else:
+        macDestino = ARPResolution(defaultGW)
+
+    # Si no hemos podido resolver la MAC destino no podemos enviar
+    if macDestino is None:
+        return False
+
+    # Construimos y enviamos cada uno de los fragmentos
+    for i in range(numFragmentos):
+
+        # Datos útiles de este fragmento
+        inicio = i * maxDatos
+        datosFragmento = data[inicio:inicio + maxDatos]
+        longitudTotal = longCabecera + len(datosFragmento)
+
+        # MF a 1 en todos los fragmentos menos en el último
+        if i < numFragmentos - 1:
+            mf = 1
+        else:
+            mf = 0
+
+        # Offset expresado en palabras de 8 bytes
+        offset = inicio // 8
+
+        # Construimos la cabecera IP campo a campo
+        versionIhl = (4 << 4) | ihl
+        flagsOffset = (mf << 13) | offset
+        cabecera = bytes([versionIhl, IP_TOS])
+        cabecera += longitudTotal.to_bytes(2, "big")
+        cabecera += IPID.to_bytes(2, "big")
+        cabecera += flagsOffset.to_bytes(2, "big")
+        cabecera += bytes([IP_TTL, protocol])
+        cabecera += bytes(2)
+        cabecera += myIP.to_bytes(4, "big")
+        cabecera += dstIP.to_bytes(4, "big")
+
+        # Añadimos las opciones IP si las hay
+        cabecera += opciones
+
+        # Calculamos el checksum sobre la cabecera y lo añadimos en su campo
+        checksum = chksum(cabecera)
+        cabecera = cabecera[:10] + checksum.to_bytes(2, "big") + cabecera[12:]
+
+        # Datagrama IP completo: cabecera + datos
+        datagrama = cabecera + datosFragmento
+
+        # Enviamos el datagrama encapsulado en una trama Ethernet
+        if sendEthernetFrame(datagrama, len(datagrama), ETHTYPE_IP, macDestino) == -1:
+            logging.error("Error enviando el datagrama IP")
+            return False
+
+    # Una vez enviado el datagrama (o sus fragmentos) incrementamos el IPID
+    IPID = (IPID + 1) & 0xFFFF
+
+    return True
 
 

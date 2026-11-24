@@ -44,13 +44,25 @@ def process_UDP_datagram(us,header,data,srcIP):
             -header: estructura pcap_pkthdr que contiene los campos len, caplen y ts.
             -data: array de bytes con el conenido del datagrama UDP
             -srcIP: dirección IP que ha enviado el datagrama actual.
-        Retorno: Ninguno
-          
+        Retorno: Ninguno  
     '''
+
+    # Comprobamos que los datos recibidos contienen al menos la cabecera UDP
+    if len(data) < UDP_HLEN: return
+
+    # Extraemos los campos de la cabecera UDP
+    srcPort = int.from_bytes(data[0:2], "big")
+    dstPort = int.from_bytes(data[2:4], "big")
+    length = int.from_bytes(data[4:6], "big")
+    checksum = int.from_bytes(data[6:8], "big")
+    payload = data[UDP_HLEN:length]
+
+    #Mostramos los campos solicitados por pantalla en modo debug
+    logging.debug(f"UDP: srcPort={srcPort} dstPort={dstPort} data={payload}")
 
 
 def sendUDPDatagram(data,dstPort,dstIP):
-     '''
+    '''
         Nombre: sendUDPDatagram
         Descripción: Esta función construye un datagrama UDP y lo envía
         Esta función debe realizar, al menos, las siguientes tareas:
@@ -67,7 +79,25 @@ def sendUDPDatagram(data,dstPort,dstIP):
         Retorno: True o False en función de si se ha enviado el datagrama correctamente o no
           
     '''
-    udp_datagram = bytes()
+    
+    # Obtenemos un puerto origen libre de la máquina actual
+    puertoOrigen = getUDPSourcePort()
+
+    # Calculamos la longitud total del datagrama UDP (cabecera + datos)
+    longitud = UDP_HLEN + len(data)
+
+    #Construimos la cabecera UDP. El checksum siempre a 0
+    udp_datagram = puertoOrigen.to_bytes(2, "big")
+    udp_datagram += dstPort.to_bytes(2, "big")
+    udp_datagram += longitud.to_bytes(2, "big")
+    udp_datagram += bytes(2)
+
+    # Añadimos los datos
+    udp_datagram += data
+
+    # Enviamos el datagrama resultante usando el nivel IP (protocolo 17)
+    return sendIPDatagram(dstIP, udp_datagram, UDP_PROTO)
+
 
 
 def initUDP():
@@ -82,3 +112,5 @@ def initUDP():
         Retorno: Ninguno
           
     '''
+    # Registramos el nivel UDP en la tabla de protocolos de nivel superior de IP
+    registerIPProtocol(process_UDP_datagram, UDP_PROTO)

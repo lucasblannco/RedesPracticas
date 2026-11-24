@@ -36,7 +36,8 @@ if __name__ == "__main__":
 	parser.add_argument('--debug', dest='debug', default=False, action='store_true',help='Activar Debug messages')
 	parser.add_argument('--addOptions', dest='addOptions', default=False, action='store_true',help='Añadir opciones a los datagranas IP')
 	parser.add_argument('--dataFile',dest='dataFile',default = False,help='Fichero con datos a enviar')
-	#TODO: Opción --icmpsize
+	# TODO: Opción --icmpsize
+	parser.add_argument('--icmpsize', dest='icmpsize', default=False, type=int,help='Tamaño en bytes de los datos del mensaje ICMP')
 	args = parser.parse_args()
 
 	if args.debug:
@@ -68,6 +69,10 @@ if __name__ == "__main__":
 	
 	icmp_data = b'ABCDEFGHIJKL'
 	#TODO: construir mensaje ICMP según opción --icmpsize
+	if args.icmpsize is not False:
+		letras = b'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+		n = args.icmpsize
+		icmp_data = bytes(letras[i % 26] for i in range(n))
 	
 	startEthernetLevel(args.interface)
 	initICMP()
